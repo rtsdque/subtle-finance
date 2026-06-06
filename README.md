@@ -19,8 +19,6 @@ It approaches that question three ways simultaneously:
 
 When the three methodologies agree, that's a signal. When they diverge, that's a more interesting signal — and that's where the Claude AI analyst layer earns its place.
 
----
-
 ## Features
 
 - **Live data** — real-time prices and financials via yfinance and SEC EDGAR for all 503 S&P 500 companies
