@@ -1,0 +1,22 @@
+artifact_path: file:c:/Users/16315/Desktop/Python/Projects/Subtle Finance Project/notebooks/mlruns/1/models/m-9165787a646b4058b5d61c404b35bc31/artifacts
+flavors:
+  python_function:
+    data: model.ubj
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.13.5
+  xgboost:
+    code: null
+    data: model.ubj
+    model_class: xgboost.sklearn.XGBRegressor
+    model_format: ubj
+    xgb_version: 3.2.0
+mlflow_version: 3.13.0
+model_id: m-9165787a646b4058b5d61c404b35bc31
+model_size_bytes: 783157
+model_uuid: m-9165787a646b4058b5d61c404b35bc31
+prompts: null
+run_id: 0793e16247bc4140814d0972d854144b
+utc_time_created: '2026-06-06 00:44:31.024736'
