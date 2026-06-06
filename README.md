@@ -3,6 +3,7 @@
 A three-methodology valuation engine for S&P 500 companies, combining comparable company analysis, machine learning, and discounted cash flow modeling into a single interactive dashboard.
 
 **Live App:** https://subtlefinance.streamlit.app/ 
+
 **Stack:** Python, XGBoost, scikit-learn, Prophet, Streamlit, Claude API, MLflow, yfinance, SEC EDGAR
 
 ## Overview
