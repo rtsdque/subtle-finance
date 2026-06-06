@@ -13,11 +13,10 @@ warnings.filterwarnings('ignore')
 from dotenv import load_dotenv
 import os
 load_dotenv()
-import os
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data", "processed")
 RAW_DIR = os.path.join(BASE_DIR, "data", "raw")
-
 
 st.set_page_config(
     page_title="Subtle Finance",
@@ -31,7 +30,8 @@ def load_data():
     final_df = pd.read_csv(os.path.join(DATA_DIR, "final_valuations.csv"))
     knn_df = pd.read_csv(os.path.join(DATA_DIR, "knn_features.csv"))
     dcf_df = pd.read_csv(os.path.join(DATA_DIR, "dcf_valuations.csv"))
-    return master_df, final_df, knn_df, dcf_df
+    dcf_sensitivity_df = pd.read_csv(os.path.join(DATA_DIR, "dcf_sensitivity.csv"))
+    return master_df, final_df, knn_df, dcf_df, dcf_sensitivity_df
 
 @st.cache_resource
 def load_models():
@@ -45,7 +45,7 @@ def load_models():
         model_features = pickle.load(f)
     return xgb_model, knn_model, knn_scaler, model_features
 
-master_df, final_df, knn_df, dcf_df = load_data()
+master_df, final_df, knn_df, dcf_df, dcf_sensitivity_df = load_data()
 xgb_model, knn_model, knn_scaler, model_features = load_models()
 
 st.title("📈 Subtle Finance")
@@ -63,7 +63,6 @@ analyze = st.button("Analyze", type="primary", use_container_width=True)
 if analyze:
     if not ticker1 or not ticker2:
         st.error("Please enter both ticker symbols before analyzing.")
-    
     else:
         st.session_state['ticker1'] = ticker1
         st.session_state['ticker2'] = ticker2
@@ -71,7 +70,6 @@ if analyze:
         st.session_state['messages'] = []
 
 if st.session_state.get('analyzed'):
-    st.markdown('<div id="top"></div>', unsafe_allow_html=True)
     ticker1 = st.session_state['ticker1']
     ticker2 = st.session_state['ticker2']
 
@@ -292,67 +290,33 @@ if st.session_state.get('analyzed'):
 
     def show_dcf_sensitivity(ticker, label):
         st.markdown(f"**{label}**")
-        try:
-            income_stmt = pd.read_csv(os.path.join(RAW_DIR, ticker, "income_statement.csv"), index_col=0)
-            cash_flow_stmt = pd.read_csv(os.path.join(RAW_DIR, ticker, "cash_flow.csv"), index_col=0)
 
-            def get_val(df, names):
-                for name in names:
-                    if name in df.index:
-                        vals = df.loc[name].dropna()
-                        if len(vals) > 0:
-                            return vals.astype(float)
-                return None
+        row = dcf_sensitivity_df[dcf_sensitivity_df['symbol'] == ticker]
+        if row.empty:
+            st.caption("DCF sensitivity unavailable.")
+            return
 
-            revenue = get_val(income_stmt, ['Total Revenue'])
-            fcf = get_val(cash_flow_stmt, ['Free Cash Flow'])
+        row = row.iloc[0]
+        cagr = row['cagr']
+        avg_fcf_margin = row['avg_fcf_margin']
 
-            if revenue is None or fcf is None or len(revenue) < 2:
-                st.caption("Insufficient data for DCF.")
-                return
+        wacc_range = [0.07, 0.08, 0.09, 0.10, 0.11, 0.12, 0.13]
+        tgr_range = [0.01, 0.02, 0.03, 0.04, 0.05]
 
-            revenue = revenue.sort_index()
-            fcf = fcf.sort_index()
+        sensitivity = {}
+        for wacc in wacc_range:
+            r = {}
+            for tgr in tgr_range:
+                key = f"wacc_{int(wacc*100)}_tgr_{int(tgr*100)}"
+                val = row.get(key)
+                r[f"TGR {int(tgr*100)}%"] = f"${val:,.0f}" if pd.notna(val) and val else 'N/A'
+            sensitivity[f"WACC {int(wacc*100)}%"] = r
 
-            years = len(revenue)
-            cagr = (revenue.iloc[-1] / revenue.iloc[0]) ** (1/(years-1)) - 1
-            cagr = max(min(cagr, 0.30), -0.10)
-            avg_fcf_margin = max(min((fcf / revenue).mean(), 0.40), 0.01)
-            latest_revenue = revenue.iloc[-1]
-
-            wacc_range = [0.07, 0.08, 0.09, 0.10, 0.11, 0.12, 0.13]
-            tgr_range = [0.01, 0.02, 0.03, 0.04, 0.05]
-
-            company_row = master_df[master_df['symbol'] == ticker].iloc[0]
-            shares = company_row['shares_outstanding']
-            net_debt = company_row['net_debt'] if pd.notna(company_row['net_debt']) else 0
-
-            projected_fcf = [latest_revenue * (1 + cagr) ** i * avg_fcf_margin for i in range(1, 6)]
-
-            sensitivity = {}
-            for wacc in wacc_range:
-                row = {}
-                for tgr in tgr_range:
-                    if wacc <= tgr:
-                        row[f"TGR {tgr*100:.0f}%"] = 'N/A'
-                        continue
-                    pv_fcfs = sum([f / (1+wacc)**i for i, f in enumerate(projected_fcf, 1)])
-                    tv = projected_fcf[-1] * (1+tgr) / (wacc - tgr)
-                    pv_tv = tv / (1+wacc)**5
-                    ev = pv_fcfs + pv_tv
-                    equity = ev - net_debt
-                    per_share = equity / shares if shares else None
-                    row[f"TGR {tgr*100:.0f}%"] = f"${per_share:,.0f}" if per_share and per_share > 0 else 'N/A'
-                sensitivity[f"WACC {wacc*100:.0f}%"] = row
-
-            sensitivity_df = pd.DataFrame(sensitivity).T
-            company_row2 = master_df[master_df['symbol'] == ticker].iloc[0]
-            current_price = company_row2['current_price']
-            st.caption(f"Current price: ${current_price:,.2f} | Revenue CAGR: {cagr*100:.1f}% | FCF Margin: {avg_fcf_margin*100:.1f}%")
-            st.dataframe(sensitivity_df, use_container_width=True)
-
-        except Exception as e:
-            st.caption(f"DCF sensitivity unavailable: {e}")
+        sensitivity_df_display = pd.DataFrame(sensitivity).T
+        company_row = master_df[master_df['symbol'] == ticker].iloc[0]
+        current_price = company_row['current_price']
+        st.caption(f"Current price: ${current_price:,.2f} | Revenue CAGR: {cagr:.1f}% | FCF Margin: {avg_fcf_margin:.1f}%")
+        st.dataframe(sensitivity_df_display, use_container_width=True)
 
     col1, col2 = st.columns(2)
     with col1:
