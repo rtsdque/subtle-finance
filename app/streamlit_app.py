@@ -13,6 +13,11 @@ warnings.filterwarnings('ignore')
 from dotenv import load_dotenv
 import os
 load_dotenv()
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data", "processed")
+RAW_DIR = os.path.join(BASE_DIR, "data", "raw")
+
 
 st.set_page_config(
     page_title="Subtle Finance",
@@ -22,21 +27,21 @@ st.set_page_config(
 
 @st.cache_data
 def load_data():
-    master_df = pd.read_csv("../data/processed/master_features.csv")
-    final_df = pd.read_csv("../data/processed/final_valuations.csv")
-    knn_df = pd.read_csv("../data/processed/knn_features.csv")
-    dcf_df = pd.read_csv("../data/processed/dcf_valuations.csv")
+    master_df = pd.read_csv(os.path.join(DATA_DIR, "master_features.csv"))
+    final_df = pd.read_csv(os.path.join(DATA_DIR, "final_valuations.csv"))
+    knn_df = pd.read_csv(os.path.join(DATA_DIR, "knn_features.csv"))
+    dcf_df = pd.read_csv(os.path.join(DATA_DIR, "dcf_valuations.csv"))
     return master_df, final_df, knn_df, dcf_df
 
 @st.cache_resource
 def load_models():
-    with open("../data/processed/xgboost_model.pkl", "rb") as f:
+    with open(os.path.join(DATA_DIR, "xgboost_model.pkl"), "rb") as f:
         xgb_model = pickle.load(f)
-    with open("../data/processed/knn_model.pkl", "rb") as f:
+    with open(os.path.join(DATA_DIR, "knn_model.pkl"), "rb") as f:
         knn_model = pickle.load(f)
-    with open("../data/processed/knn_scaler.pkl", "rb") as f:
+    with open(os.path.join(DATA_DIR, "knn_scaler.pkl"), "rb") as f:
         knn_scaler = pickle.load(f)
-    with open("../data/processed/model_features.pkl", "rb") as f:
+    with open(os.path.join(DATA_DIR, "model_features.pkl"), "rb") as f:
         model_features = pickle.load(f)
     return xgb_model, knn_model, knn_scaler, model_features
 
@@ -288,8 +293,8 @@ if st.session_state.get('analyzed'):
     def show_dcf_sensitivity(ticker, label):
         st.markdown(f"**{label}**")
         try:
-            income_stmt = pd.read_csv(f"../data/raw/{ticker}/income_statement.csv", index_col=0)
-            cash_flow_stmt = pd.read_csv(f"../data/raw/{ticker}/cash_flow.csv", index_col=0)
+            income_stmt = pd.read_csv(os.path.join(RAW_DIR, ticker, "income_statement.csv"), index_col=0)
+            cash_flow_stmt = pd.read_csv(os.path.join(RAW_DIR, ticker, "cash_flow.csv"), index_col=0)
 
             def get_val(df, names):
                 for name in names:
